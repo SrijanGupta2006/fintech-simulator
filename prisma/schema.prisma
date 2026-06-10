@@ -1,0 +1,99 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  passwordHash  String?   // Made optional for OAuth logins
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Your existing trading relations
+  wallet        Wallet?
+  assets        AssetHolding[]
+  transactions  Transaction[]
+
+  // New Auth.js relations
+  accounts      Account[]
+  sessions      Session[]
+}
+
+model Wallet{
+  id        String   @id @default(cuid())
+  balance   Float    @default(100000.00) // Starting paper money
+  updatedAt DateTime @updatedAt
+
+  // Foreign Key linking back to User
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AssetHolding{
+  id           String   @id @default(cuid())
+  symbol       String   // e.g., "AAPL"
+  quantity     Float    // Can be fractional shares
+  averagePrice Float
+  updatedAt    DateTime @updatedAt
+
+  // Foreign Key linking back to User
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // A user should only have one holding record per stock symbol
+  @@unique([userId, symbol])
+}
+
+enum TransactionType{
+    BUY
+    SELL
+}
+
+model Transaction {
+  id        String          @id @default(cuid())
+  symbol    String
+  type      TransactionType
+  quantity  Float
+  price     Float
+  createdAt DateTime        @default(now())
+
+  // Foreign Key linking back to User
+  userId    String
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Required by Auth.js for OAuth providers (Google, GitHub, etc.)
+model Account {
+  id                 String  @id @default(cuid())
+  userId             String
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String? @db.Text
+  access_token       String? @db.Text
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String? @db.Text
+  session_state      String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+// Required by Auth.js for database sessions
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
